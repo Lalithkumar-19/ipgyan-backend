@@ -7,6 +7,8 @@ import Blog from './models/Blog';
 import Contacts from './models/Contacts';
 import { VerifyAdmin } from './utils';
 import nodemailer from 'nodemailer';
+import adminModel from './models/Admin';
+import jwt from "jsonwebtoken";
 
 dotenv.config();
 
@@ -30,6 +32,20 @@ app.use(cors({
   credentials: false
 }));
 
+app.post("/admin-login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    const admin = adminModel.find({ email: email, password: password });
+    if (!admin) {
+      res.status(401).json({ message: "Unauthorized access denied" });
+    }
+    const token = jwt.sign({ email: email, password: password }, process.env.JWT_SECRET)
+    res.status(200).json({ token: token });
+
+  } catch (error) {
+    res.status(500).json({ message: "Internal Server Error" })
+  }
+})
 
 
 
