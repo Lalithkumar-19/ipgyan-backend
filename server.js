@@ -208,6 +208,8 @@ app.get('/api/google-reviews', async (req, res) => {
 
 // Send Newsletter to all subscribers (Admin only)
 app.post('/send-email', VerifyAdmin, async (req, res) => {
+  console.log("sender activated");
+  console.log(req.body);
   try {
     const { subject, html, text } = req.body || {};
     if (!subject || (!html && !text)) {
@@ -328,7 +330,10 @@ app.get("/dashboard/stats", VerifyAdmin, async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: "Internal Server Error" })
   }
-})
+});
+
+
+
 
 
 app.listen(PORT, () => {
