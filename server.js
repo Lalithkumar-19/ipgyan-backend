@@ -25,13 +25,7 @@ mongoose.connect("mongodb+srv://lalith:developer@cluster0.r0mccth.mongodb.net/?r
   })
 
 // Allow CORS from local dev and general use
-app.use(cors({
-  origin: [
-    'http://localhost:5173', // Vite default
-    'http://127.0.0.1:5173'
-  ],
-  credentials: false
-}));
+app.use(cors());
 
 app.post("/admin-login", async (req, res) => {
   try {
