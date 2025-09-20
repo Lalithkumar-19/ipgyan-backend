@@ -2,12 +2,12 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
-import NewsLetter from './models/NewsLetter';
-import Blog from './models/Blog';
-import Contacts from './models/Contacts';
-import { VerifyAdmin } from './utils';
+import NewsLetter from './models/NewsLetter.js';
+import Blog from './models/Blog.js';
+import Contacts from './models/Contacts.js';
+import { VerifyAdmin } from './utils/index.js';
 import nodemailer from 'nodemailer';
-import adminModel from './models/Admin';
+import adminModel from './models/Admin.js';
 import jwt from "jsonwebtoken";
 
 dotenv.config();
@@ -15,7 +15,8 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 app.use(express.json());
-mongoose.connect("mongodb+srv://newsletteripgyan_db_user:6Bvio5jIo1tThNbt@cluster0.r0mccth.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
+
+mongoose.connect("mongodb+srv://lalith:developer@cluster0.r0mccth.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
   .then(() => {
     console.log("Connected to Db successfully ");
   })
@@ -35,12 +36,14 @@ app.use(cors({
 app.post("/admin-login", async (req, res) => {
   try {
     const { email, password } = req.body;
-    const admin = adminModel.find({ email: email, password: password });
+    const admin = await adminModel.findOne({ email: email, password: password });
+    console.log(admin, "admin");
+    console.log(req.body);
     if (!admin) {
-      res.status(401).json({ message: "Unauthorized access denied" });
+      return res.status(401).json({ message: "Unauthorized access denied" });
     }
     const token = jwt.sign({ email: email, password: password }, process.env.JWT_SECRET)
-    res.status(200).json({ token: token });
+    res.status(200).json({ token: token, user: admin.name });
 
   } catch (error) {
     res.status(500).json({ message: "Internal Server Error" })
@@ -50,9 +53,14 @@ app.post("/admin-login", async (req, res) => {
 
 
 //api's for Newletter requesting
-app.post("/news-letter-req", async (req, res) => {
+app.post("/news-letter-req",VerifyAdmin, async (req, res) => {
   const { email } = req.body;
+ 
   try {
+    const isexist = await NewsLetter.findOne({ email: email })
+    if (isexist) {
+      return res.status(200).json({ message: "Email already exists" })
+    }
     const newsLetter = new NewsLetter({ email })
     await newsLetter.save();
     res.status(200).json({ message: "NewsLetter Requested Successfully" })
@@ -62,15 +70,36 @@ app.post("/news-letter-req", async (req, res) => {
 })
 
 
+app.get("/news-letter-req", async (req, res) => {
+  try {
+    const subscribers = await NewsLetter.find();
+    res.status(200).json(subscribers);
+  } catch (error) {
+    res.status(500).json({ message: "Internal Server Error" })
+  }
+})
+
+app.delete("/news-letter-req/:id", VerifyAdmin, async (req, res) => {
+  const { id } = req.params;
+  try {
+    await NewsLetter.findByIdAndDelete(id);
+    res.status(200).json({ message: "NewsLetter Request Deleted Successfully" })
+  } catch (error) {
+    res.status(500).json({ message: "Internal Server Error" })
+  }
+})
+
 
 //api's for Blogs 
-app.post("/blog", VerifyAdmin, async (req, res) => {
-  const { title, description, image, author, category, tags } = req.body;
+app.post("/blogs", VerifyAdmin, async (req, res) => {
+  // console.log(req.body, "blog");
+
+  const { title, description, image, author, category, tags, content } = req.body;
   try {
-    if (!title || !description || !image || !author || !category || !tags) {
+    if (!title || !description || !image || !author || !category || !tags || !content) {
       return res.status(400).json({ message: "All fields are required" })
     }
-    const blog = new Blog({ title, description, image, author, category, tags })
+    const blog = new Blog({ title, description, image, author, category, tags, content })
     await blog.save();
     res.status(200).json({ message: "Blog Created Successfully" })
   } catch (error) {
@@ -80,14 +109,33 @@ app.post("/blog", VerifyAdmin, async (req, res) => {
 
 app.get("/blogs", async (req, res) => {
   try {
-    const blogs = await Blog.find();
-    res.status(200).json(blogs)
+    const limit = req.query.limit;
+    // const page=req.query.page;
+    if (limit) {
+      const blogs = await Blog.find().limit(limit);
+      res.status(200).json(blogs)
+    } else {
+      const blogs = await Blog.find();
+      res.status(200).json(blogs)
+    }
+
+
   } catch (error) {
     res.status(500).json({ message: "Internal Server Error" })
   }
 });
 
-app.delete("/blog/:id", VerifyAdmin, async (req, res) => {
+app.get("/blogs/:id", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const blog = await Blog.findById(id);
+    res.status(200).json(blog)
+  } catch (error) {
+    res.status(500).json({ message: "Internal Server Error" })
+  }
+})
+
+app.delete("/blogs/:id", VerifyAdmin, async (req, res) => {
   const { id } = req.params;
   try {
     await Blog.findByIdAndDelete(id);
@@ -96,7 +144,7 @@ app.delete("/blog/:id", VerifyAdmin, async (req, res) => {
     res.status(500).json({ message: "Internal Server Error" })
   }
 })
-app.put("/blog/:id", VerifyAdmin, async (req, res) => {
+app.put("/blogs/:id", VerifyAdmin, async (req, res) => {
   const { id } = req.params;
   const { title, description, image, author, category, tags } = req.body;
   try {
@@ -216,7 +264,7 @@ app.post('/send-email', VerifyAdmin, async (req, res) => {
 
 
 //contacts apis
-app.get("/get-contacts-list", VerifyAdmin, async (req, res) => {
+app.get("/contacts", VerifyAdmin, async (req, res) => {
   try {
     const contacts = await Contacts.find();
     res.status(200).json(contacts);
@@ -226,7 +274,7 @@ app.get("/get-contacts-list", VerifyAdmin, async (req, res) => {
 })
 
 
-app.post("/create-contact", VerifyAdmin, async (req, res) => {
+app.post("/contact", VerifyAdmin, async (req, res) => {
   try {
     const { fullname, email, subject, message, phone } = req.body;
     if (!fullname || !email || !subject || !message || !phone) {
@@ -242,17 +290,18 @@ app.post("/create-contact", VerifyAdmin, async (req, res) => {
   }
 })
 
-app.delete("/delete-contact/:id", VerifyAdmin, async (req, res) => {
+app.delete("/contact/:id", VerifyAdmin, async (req, res) => {
   const { id } = req.params;
   try {
     await Contacts.findByIdAndDelete(id);
-    res.status(200).json({ message: "Contact Deleted Successfully" })
+    const updatedContacts=await Contacts.find();
+    res.status(200).json({ message: "Contact Deleted Successfully",data:updatedContacts })
   } catch (error) {
     res.status(500).json({ message: "Internal Server Error" })
   }
 })
 
-app.put("/update-status/:id", VerifyAdmin, async (req, res) => {
+app.put("/contact/:id", VerifyAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
@@ -260,7 +309,8 @@ app.put("/update-status/:id", VerifyAdmin, async (req, res) => {
       return res.status(400).json({ message: "Status is required" })
     }
     await Contacts.findByIdAndUpdate(id, { status });
-    res.status(200).json({ message: "Contact Status Updated Successfully" })
+    const updatedContacts=await Contacts.find();
+    res.status(200).json({ message: "Contact Status Updated Successfully",data:updatedContacts })
 
 
   } catch (error) {
@@ -268,7 +318,17 @@ app.put("/update-status/:id", VerifyAdmin, async (req, res) => {
   }
 });
 
-
+app.get("/dashboard/stats", VerifyAdmin, async (req, res) => {
+  try {
+    const Blogcnt = await Blog.countDocuments();
+    const NewsLettercnt = await NewsLetter.countDocuments();
+    const Contactcnt = await Contacts.countDocuments();
+    const Unreadcnt = await Contacts.countDocuments({ status: "New" });
+    res.status(200).json({ Blogcnt, NewsLettercnt, Contactcnt, Unreadcnt });
+  } catch (error) {
+    res.status(500).json({ message: "Internal Server Error" })
+  }
+})
 
 
 app.listen(PORT, () => {
